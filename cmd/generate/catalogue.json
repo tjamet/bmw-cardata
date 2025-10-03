@@ -1,0 +1,239 @@
+{
+    "data": {
+        "items": [
+            {
+                "name": "Calefacción de retrovisores exteriores activa",
+                "id": "vehicle.cabin.hvac.preconditioning.status.isExteriorMirrorHeatingActive",
+                "description": "Estado actual de la calefacción de los retrovisores exteriores.",
+                "unit": "",
+                "range": "verdadero, falso",
+                "datatype": "boolean",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento de la tercera fila del lado del acompañante",
+                "id": "vehicle.cabin.seat.row3.passengerSide.heating",
+                "description": "Calefacción del asiento de la tercera fila del lado del acompañante. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento de la tercera fila del lado del conductor",
+                "id": "vehicle.cabin.seat.row3.driverSide.heating",
+                "description": "Calefacción del asiento de la tercera fila del lado del conductor. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento delantero del acompañante",
+                "id": "vehicle.cabin.seat.row1.passengerSide.heating",
+                "description": "Calefacción del asiento delantero del acompañante. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento delantero del conductor",
+                "id": "vehicle.cabin.seat.row1.driverSide.heating",
+                "description": "Calefacción del asiento delantero del conductor. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento trasero del lado del acompañante",
+                "id": "vehicle.cabin.seat.row2.passengerSide.heating",
+                "description": "Calefacción del asiento trasero del lado del acompañante. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del asiento trasero del lado del conductor",
+                "id": "vehicle.cabin.seat.row2.driverSide.heating",
+                "description": "Calefacción del asiento trasero del lado del conductor. 0 = desactivado. +100 = calor máximo.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del volante",
+                "id": "vehicle.cabin.steeringWheel.heating",
+                "description": "Valor real de la calefacción del volante en porcentaje.",
+                "unit": "percent",
+                "range": "Del 0% al 100%",
+                "datatype": "uint8",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción del volante predeterminada",
+                "id": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.steeringWheel.heating",
+                "description": "Ajustes predeterminados para la calefacción del volante para el preacondicionamiento de la climatización.",
+                "unit": "",
+                "range": "OFF, ON, AUTOMATIC, NO_CHANGE",
+                "datatype": "string",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            },
+            {
+                "name": "Calefacción directa del asiento de la tercera fila del lado del acompañante",
+                "id": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row3.passengerSide.heating",
+                "description": "Ajustes DirectStart para la calefacción del asiento de la tercera fila del lado del acompañante para el preacondicionamiento de la climatización.",
+                "unit": "",
+                "range": "OFF, ON, AUTOMATIC, NO_CHANGE",
+                "datatype": "string",
+                "streamable": true,
+                "vehicletypes": [
+                    "MHEV",
+                    "ICE",
+                    "PHEV",
+                    "BEV"
+                ],
+                "brand": [
+                    "BMW"
+                ],
+                "category": "VEHICLE_STATUS"
+            }
+        ],
+        "total": 294,
+        "offset": 10,
+        "pageSize": 10,
+        "hasNextPage": true,
+        "categories": {
+            "BASIC_DATA": {
+                "description": "DATOS BÁSICOS DE UN VEHÍCULO.",
+                "rank": 1
+            },
+            "VEHICLE_STATUS": {
+                "description": "DATOS SOBRE EL ESTADO DE UN VEHÍCULO.",
+                "rank": 2
+            },
+            "USAGE_BASED": {
+                "description": "DATOS BASADOS EN EL USO DE UN VEHÍCULO.",
+                "rank": 3
+            },
+            "EVENTS": {
+                "description": "DATOS SOBRE EVENTOS DE UN VEHÍCULO.",
+                "rank": 4
+            },
+            "BEV_PHEV_DATA": {
+                "description": "DATOS SOBRE LOS VEHÍCULOS ELÉCTRICOS.",
+                "rank": 5
+            },
+            "META_DATA": {
+                "description": "METAINFORMACIÓN DE UN VEHÍCULO.",
+                "rank": 6
+            },
+            "TYRE_DATA": {
+                "description": "DATOS DE NEUMÁTICOS DE UN VEHÍCULO.",
+                "rank": 7
+            },
+            "CD_CONTRACT": {
+                "description": "INFORMACIÓN SOBRE LOS DETALLES DEL CONTRATO CONNECTEDDRIVE.",
+                "rank": 8
+            }
+        }
+    },
+    "errorData": null,
+    "message": "",
+    "processUuid": "3b17b25b-c246-40eb-bba5-f81abe25675c",
+    "status": "SUCCESS",
+    "success": true
+}
