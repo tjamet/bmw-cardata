@@ -85,5 +85,13 @@ func ReadArchive(path string) (*Archive, error) {
 		defer fd.Close()
 		err = json.NewDecoder(fd).Decode(&archive.SmartMaintenance)
 	}
+	if archiveContent.LearningNavigationFileName != "" {
+		fd, err := zipReader.reader.Open(filepath.Join(archiveRelPath, archiveContent.LearningNavigationFileName))
+		if err != nil {
+			return nil, err
+		}
+		defer fd.Close()
+		err = json.NewDecoder(fd).Decode(&archive.AdaptiveNavigation)
+	}
 	return &archive, nil
 }

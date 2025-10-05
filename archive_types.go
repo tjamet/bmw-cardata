@@ -1,5 +1,11 @@
 package bmwcardata
 
+type AdaptiveNavigationArchive struct {
+	Places      []NavigationPlaces      `json:"places,omitempty"`
+	Routes      []NavigationRoutes      `json:"routes,omitempty"`
+	Transitions []NavigationTransitions `json:"transitions,omitempty"`
+}
+
 type ChargingSessionArchive struct {
 	ChargingBlocks                 []ChargingBlock          `json:"chargingBlocks,omitempty"`
 	ChargingCostInformation        *ChargingCostInformation `json:"chargingCostInformation,omitempty"`
@@ -16,6 +22,123 @@ type ChargingSessionArchive struct {
 	TimeZone                       string                   `json:"timeZone,omitempty"`
 	TotalChargingDurationSec       int64                    `json:"totalChargingDurationSec,omitempty"`
 	BusinessErrors                 []BusinessError          `json:"businessErrors,omitempty"`
+}
+
+type NavigationPlaces struct {
+	ClusterHistory                   []NavigationClusterHistory `json:"clusterHistory,omitempty"`
+	DepartureToUnknownStatistics     VisitStatistics            `json:"departureToUnknownStatistics,omitempty"`
+	Place                            Place                      `json:"place,omitempty"`
+	VisitScoreDistributionStatistics VisitStatistics            `json:"visitScoreDistributionStatistics,omitempty"`
+}
+
+type NavigationTransitions struct {
+	Category            string          `json:"category,omitempty"`
+	Created             Time            `json:"created,omitempty"`
+	DateTimeCreated     Time            `json:"dateTimeCreated,omitempty"`
+	DateTimeUpdated     Time            `json:"dateTimeUpdated,omitempty"`
+	DepartureStatistics VisitStatistics `json:"departureStatistics,omitempty"`
+	DestinationID       string          `json:"destinationId,omitempty"`
+	ID                  string          `json:"id,omitempty"`
+	IsBlacklisted       bool            `json:"isBlacklisted,omitempty"`
+	Metadata            []Metadata      `json:"metadata,omitempty"`
+	Modified            Time            `json:"modified,omitempty"`
+	OriginID            string          `json:"originId,omitempty"`
+}
+
+type Place struct {
+	Created         Time        `json:"created,omitempty"`
+	DateTimeCreated Time        `json:"dateTimeCreated,omitempty"`
+	DateTimeUpdated Time        `json:"dateTimeUpdated,omitempty"`
+	Center          Coordinates `json:"center,omitempty"`
+	ID              string      `json:"id,omitempty"`
+	IsBlacklisted   bool        `json:"isBlacklisted,omitempty"`
+	LearnedLabel    Label       `json:"learnedLabel,omitempty"`
+	//Metadata []any `json:"metadata,omitempty"`
+	Modified       Time    `json:"modified,omitempty"`
+	Radius         float64 `json:"radius,omitempty"`
+	RelevanceScore float64 `json:"relevanceScore,omitempty"`
+	UserEdited     bool    `json:"userEdited,omitempty"`
+}
+
+// Time holds a time deserializer
+// TODO: parse the BMW data into a time.Time
+type Time string
+
+type Entry struct {
+	Score float64  `json:"score,omitempty"`
+	Key   EntryKey `json:"key,omitempty"`
+}
+
+type EntryKey struct {
+	TimeBucketId int `json:"timeBucketId,omitempty"`
+	Weekday      int `json:"weekday,omitempty"`
+}
+
+type Label struct {
+	Label         string  `json:"label,omitempty"`
+	SuccessFactor float64 `json:"successFactor,omitempty"`
+}
+
+type VisitStatistics struct {
+	Created         Time    `json:"created,omitempty"`
+	DateTimeCreated Time    `json:"dateTimeCreated,omitempty"`
+	DateTimeUpdated Time    `json:"dateTimeUpdated,omitempty"`
+	Entries         []Entry `json:"entries,omitempty"`
+	Modified        Time    `json:"modified,omitempty"`
+	Name            string  `json:"name,omitempty"`
+	TimeResolution  int64   `json:"timeResolution,omitempty"`
+}
+
+type NavigationRoutes struct {
+	Route      Route      `json:"route,omitempty"`
+	Statistics Statistics `json:"statistics,omitempty"`
+}
+
+type Route struct {
+	Created       Time       `json:"created,omitempty"`
+	DestinationID string     `json:"destinationId,omitempty"`
+	ID            string     `json:"id,omitempty"`
+	Metadata      []Metadata `json:"metadata,omitempty"`
+	Modified      Time       `json:"modified,omitempty"`
+	OriginID      string     `json:"originId,omitempty"`
+	Segments      []Segment  `json:"segments,omitempty"`
+}
+
+type Statistics struct {
+	Created         Time    `json:"created,omitempty"`
+	DateTimeCreated Time    `json:"dateTimeCreated,omitempty"`
+	DateTimeUpdated Time    `json:"dateTimeUpdated,omitempty"`
+	Entries         []Entry `json:"entries,omitempty"`
+	Modified        Time    `json:"modified,omitempty"`
+	Name            string  `json:"name,omitempty"`
+	TimeResolution  int64   `json:"timeResolution,omitempty"`
+}
+
+type Segment struct {
+	Locations []Location `json:"locations,omitempty"`
+	SegmentID int        `json:"segmentId,omitempty"`
+}
+
+type Location struct {
+	Location Coordinates `json:"location,omitempty"`
+}
+
+type Metadata struct {
+	Count           int    `json:"count,omitempty"`
+	DecayedCount    int    `json:"decayedCount,omitempty"`
+	LastUpdatedTime Time   `json:"lastUpdatedTime,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Value           string `json:"value,omitempty"`
+}
+
+type NavigationClusterHistory struct {
+	Accuracy    float64     `json:"accuracy,omitempty"`
+	Coordinates Coordinates `json:"coordinates,omitempty"`
+}
+
+type Coordinates struct {
+	Latitude  float64 `json:"lat,omitempty"`
+	Longitude float64 `json:"lng,omitempty"`
 }
 
 // ChargingBlock is currently unspecified in the provided samples (arrays are empty).
@@ -182,16 +305,17 @@ type TyreWear struct {
 }
 
 type Archive struct {
-	VIN                 string                   `json:"vin,omitempty"`
-	UnitOfLength        string                   `json:"unitOfLength,omitempty"`
-	BasicVehicleData    BasicVehicleData         `json:"basicVehicleData,omitempty"`
-	CasaContractDetails []CasaContractDetails    `json:"casaContractDetails,omitempty"`
-	TelematicValues     []TelematicValues        `json:"telematicValues,omitempty"`
-	VehicleImage        string                   `json:"vehicleImage,omitempty"`
-	Lang                string                   `json:"lang,omitempty"`
-	RequestDate         string                   `json:"requestDate,omitempty"`
-	SmartMaintenance    SmartMaintenanceArchive  `json:"smartMaintenance,omitempty"`
-	ChargingHistory     []ChargingSessionArchive `json:"chargingHistory,omitempty"`
+	VIN                 string                    `json:"vin,omitempty"`
+	UnitOfLength        string                    `json:"unitOfLength,omitempty"`
+	BasicVehicleData    BasicVehicleData          `json:"basicVehicleData,omitempty"`
+	CasaContractDetails []CasaContractDetails     `json:"casaContractDetails,omitempty"`
+	TelematicValues     []TelematicValues         `json:"telematicValues,omitempty"`
+	VehicleImage        string                    `json:"vehicleImage,omitempty"`
+	Lang                string                    `json:"lang,omitempty"`
+	RequestDate         string                    `json:"requestDate,omitempty"`
+	SmartMaintenance    SmartMaintenanceArchive   `json:"smartMaintenance,omitempty"`
+	ChargingHistory     []ChargingSessionArchive  `json:"chargingHistory,omitempty"`
+	AdaptiveNavigation  AdaptiveNavigationArchive `json:"adaptiveNavigationArchive,omitempty"`
 }
 
 // Types for parsing the BMW CarData "KeyList" XML (customerArchiveContent)
@@ -211,13 +335,14 @@ type Archive struct {
 //	unitOfLength="km"
 //	vin="WBY...">
 type customerArchiveContent struct {
-	ChargingHistoryFileName  string `xml:"chargingHistoryFileName,attr"`
-	KeyListFileName          string `xml:"keyListFileName,attr"`
-	Lang                     string `xml:"lang,attr"`
-	RequestDate              string `xml:"requestDate,attr"`
-	SmartMaintenanceFileName string `xml:"smartMaintenanceFileName,attr"`
-	UnitOfLength             string `xml:"unitOfLength,attr"`
-	VIN                      string `xml:"vin,attr"`
+	ChargingHistoryFileName    string `xml:"chargingHistoryFileName,attr"`
+	KeyListFileName            string `xml:"keyListFileName,attr"`
+	LearningNavigationFileName string `xml:"learningNavigationFileName,attr"`
+	Lang                       string `xml:"lang,attr"`
+	RequestDate                string `xml:"requestDate,attr"`
+	SmartMaintenanceFileName   string `xml:"smartMaintenanceFileName,attr"`
+	UnitOfLength               string `xml:"unitOfLength,attr"`
+	VIN                        string `xml:"vin,attr"`
 
 	BasicVehicleData            BasicVehicleData      `xml:"basicVehicleData"`
 	CasaContractDetailsDataList []CasaContractDetails `xml:"casaContractDetailsDataList"`
