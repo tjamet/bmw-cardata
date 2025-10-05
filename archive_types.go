@@ -1,5 +1,12 @@
 package bmwcardata
 
+import (
+	"encoding/xml"
+	"fmt"
+	"strconv"
+	"time"
+)
+
 type AdaptiveNavigationArchive struct {
 	Places      []NavigationPlaces      `json:"places,omitempty"`
 	Routes      []NavigationRoutes      `json:"routes,omitempty"`
@@ -60,9 +67,83 @@ type Place struct {
 	UserEdited     bool    `json:"userEdited,omitempty"`
 }
 
-// Time holds a time deserializer
-// TODO: parse the BMW data into a time.Time
-type Time string
+// Time is a wrapper around Time to allow detecting the format used
+// in the BMW CarData archive. There has been 7 different formats
+// detected so far.
+// It is specially designed to re-serialize the time in the same format
+// as the original data to help ensure there is no data loss when parsing
+type Time struct {
+	time.Time
+	format string
+	parsed bool
+}
+
+func (t *Time) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var data string
+	if err := d.DecodeElement(&data, &start); err != nil {
+		return err
+	}
+	return t.parseAndDetectFormat(data)
+}
+
+func (t *Time) parseAndDetectFormat(data string) error {
+	for _, format := range []string{
+		"2006-01-02T15:04:05.000-0700",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05.999999Z",
+		"2006-01-02T15:04:05.999Z",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+		"02.01.2006 15:04:05 MST",
+	} {
+		parsed, err := time.Parse(format, string(data))
+		if err == nil {
+			t.Time = parsed
+			t.format = format
+			t.parsed = true
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid time format: %s", string(data))
+}
+
+func (t *Time) UnmarshalJSON(data []byte) error {
+	isNumeric := true
+	for _, c := range data {
+		if c < '0' || c > '9' {
+			isNumeric = false
+			break
+		}
+	}
+	if isNumeric {
+		parsed, err := strconv.ParseInt(string(data), 10, 64)
+		if err != nil {
+			return err
+		}
+		t.Time = time.Unix(parsed, 0)
+		t.format = "unix"
+		t.parsed = true
+		return nil
+	}
+	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
+		return fmt.Errorf("invalid time format: %s", string(data))
+	}
+	data = data[1 : len(data)-1]
+	return t.parseAndDetectFormat(string(data))
+}
+
+func (t Time) MarshalJSON() ([]byte, error) {
+	if !t.parsed {
+		return []byte(`""`), nil
+	}
+	if t.format == "unix" {
+		return []byte(fmt.Sprintf("%d", t.Time.Unix())), nil
+	}
+	if t.format == "" {
+		return []byte(fmt.Sprintf("\"%s\"", t.Time.Format(time.RFC3339))), nil
+	}
+	return []byte(fmt.Sprintf("\"%s\"", t.Time.Format(t.format))), nil
+}
 
 type Entry struct {
 	Score float64  `json:"score,omitempty"`
@@ -147,8 +228,8 @@ type ChargingBlock struct {
 	IsPreconditioningActivated     bool    `json:"isPreconditioningActivated,omitempty"`
 	AverageChargingPowerW          float64 `json:"averagePowerGridKw,omitempty"`
 	EnergyConsumedFromPowerGridKwh float64 `json:"energyConsumedFromPowerGridKwh,omitempty"`
-	StartTime                      int64   `json:"startTime,omitempty"`
-	EndTime                        int64   `json:"endTime,omitempty"`
+	StartTime                      Time    `json:"startTime,omitempty"`
+	EndTime                        Time    `json:"endTime,omitempty"`
 }
 
 type ChargingLocation struct {
@@ -177,7 +258,7 @@ type PotentialChargingPointMatch struct {
 }
 
 type BusinessError struct {
-	CreationTime string `json:"creationTime,omitempty"`
+	CreationTime Time   `json:"creationTime,omitempty"`
 	Hint         string `json:"hint,omitempty"`
 }
 
@@ -244,7 +325,7 @@ type TyreDimension struct {
 // TyreMountingDate holds the mounting date value with labels.
 type TyreMountingDate struct {
 	Label        string `json:"label,omitempty"`
-	MountingDate string `json:"mountingDate,omitempty"`
+	MountingDate Time   `json:"mountingDate,omitempty"`
 	Value        string `json:"value,omitempty"`
 }
 
@@ -338,9 +419,9 @@ type customerArchiveContent struct {
 	ChargingHistoryFileName    string `xml:"chargingHistoryFileName,attr"`
 	KeyListFileName            string `xml:"keyListFileName,attr"`
 	LearningNavigationFileName string `xml:"learningNavigationFileName,attr"`
+	SmartMaintenanceFileName   string `xml:"smartMaintenanceFileName,attr"`
 	Lang                       string `xml:"lang,attr"`
 	RequestDate                string `xml:"requestDate,attr"`
-	SmartMaintenanceFileName   string `xml:"smartMaintenanceFileName,attr"`
 	UnitOfLength               string `xml:"unitOfLength,attr"`
 	VIN                        string `xml:"vin,attr"`
 
@@ -375,8 +456,8 @@ type TelematicValue struct {
 	Name             string `xml:"name" json:"name,omitempty"`
 	Value            string `xml:"value" json:"value,omitempty"`
 	Unit             string `xml:"unit" json:"unit,omitempty"`
-	FetchTimestamp   string `xml:"fetchTimestamp" json:"fetchTimestamp,omitempty"`
-	ValueTimestamp   string `xml:"valueTimestamp" json:"valueTimestamp,omitempty"`
+	FetchTimestamp   Time   `xml:"fetchTimestamp" json:"fetchTimestamp,omitempty"`
+	ValueTimestamp   Time   `xml:"valueTimestamp" json:"valueTimestamp,omitempty"`
 	DataCategoryType string `xml:"dataCategoryType" json:"dataCategoryType,omitempty"`
 	TelematicKeyName string `xml:"telematicKeyName" json:"telematicKeyName,omitempty"`
 }
@@ -391,8 +472,8 @@ type CasaContractDetails struct {
 
 // ContractPeriod holds optional start/end timestamps.
 type ContractPeriod struct {
-	Start string `xml:"start,omitempty" json:"start,omitempty"`
-	End   string `xml:"end,omitempty" json:"end,omitempty"`
+	Start Time `xml:"start,omitempty" json:"start,omitempty"`
+	End   Time `xml:"end,omitempty" json:"end,omitempty"`
 }
 
 // OfferID holds offer identifiers for a contract.
