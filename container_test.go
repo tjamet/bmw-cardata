@@ -2,6 +2,8 @@ package bmwcardata
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"testing"
 
@@ -206,4 +208,64 @@ func TestFindDescriptors(t *testing.T) {
 	if len(results) != 0 {
 		t.Fatalf("expected 0 descriptors, got %d", len(results))
 	}
+}
+
+func ExampleClient_ListContainers() {
+	client := Must(NewClient(
+		WithAuthenticator(
+			Must(NewAuthenticator(
+				WithClientID(clientID),
+				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
+					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+				}),
+			)),
+		)),
+	)
+
+	ctx := context.Background()
+	containers, err := client.ListContainers(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Containers: %d\n", len(*containers.Containers))
+
+	// Output: Open https://example.com and enter code 123456
+	// Direct link: https://example.com?code=123456
+	// Containers: 1
+}
+
+func ExampleClient_CreateContainer() {
+	client := Must(NewClient(
+		WithAuthenticator(
+			Must(NewAuthenticator(
+				WithClientID(clientID),
+				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
+					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+				}),
+			)),
+		)),
+	)
+
+	ctx := context.Background()
+	result, err := client.CreateContainer(
+		ctx,
+		"phev-info",
+		"All info I want to know about my PHEV",
+		FindDescriptors(
+			MatchAll(
+				MatchVehicleType(VehicleTypePHEV),
+				MatchBrand(BrandBMW),
+			),
+		),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Containers: %s\n", *result.JSON201.ContainerId)
+
+	// Output: Open https://example.com and enter code 123456
+	// Direct link: https://example.com?code=123456
+	// Containers: 123456
 }

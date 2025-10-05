@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"testing"
 	"time"
@@ -648,4 +650,78 @@ func TestUnderlyingClientErrorPropagation(t *testing.T) {
 	if !errors.Is(err, underlyingErr) {
 		t.Fatalf("expected underlying error, got %v", err)
 	}
+}
+
+func ExampleClient_GetBasicData() {
+	client := Must(NewClient(
+		WithAuthenticator(
+			Must(NewAuthenticator(
+				WithClientID(clientID),
+				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
+					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+				}),
+			)),
+		)),
+	)
+
+	ctx := context.Background()
+	vin := "WBA00000000000000"
+	vehicle, err := client.GetBasicData(ctx, vin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Vehicle: %+v\n", *vehicle.ModelName)
+	// Output: Open https://example.com and enter code 123456
+	// Direct link: https://example.com?code=123456
+	// Vehicle: X7
+}
+
+func ExampleClient_GetMappings() {
+	client := Must(NewClient(
+		WithAuthenticator(
+			Must(NewAuthenticator(
+				WithClientID(clientID),
+				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
+					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+				}),
+			)),
+		)),
+	)
+
+	ctx := context.Background()
+	mappings, err := client.GetMappings(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Mappings: %d\n", len(mappings))
+	// Output: Open https://example.com and enter code 123456
+	// Direct link: https://example.com?code=123456
+	// Mappings: 2
+}
+
+func ExampleClient_GetChargingHistory() {
+	client := Must(NewClient(
+		WithAuthenticator(
+			Must(NewAuthenticator(
+				WithClientID(clientID),
+				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
+					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+				}),
+			)),
+		)),
+	)
+
+	ctx := context.Background()
+	vin := "WBA00000000000000"
+	chargingHistory, err := client.GetChargingHistory(ctx, vin, time.Now().Add(-1*24*time.Hour), time.Now())
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Charging history: %+v\n", *chargingHistory.Data[0].EnergyConsumedFromPowerGridKwh)
+	// Output: Open https://example.com and enter code 123456
+	// Direct link: https://example.com?code=123456
+	// Charging history: 15.4
 }

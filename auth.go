@@ -311,6 +311,9 @@ func (c *AuthClient) InitiateAuthenticationSession(ctx context.Context, clientID
 		},
 		data,
 	)
+	if err != nil {
+		return nil, err
+	}
 	structuredResponse, err := auth.ParsePostGcdmOauthDeviceCodeResponse(resp)
 	if err != nil {
 		return nil, err
