@@ -395,7 +395,7 @@ func (c *AuthClient) parseOauthTokenResponse(ctx context.Context, parsedClientID
 		session := &AuthenticatedSession{
 			ClientID:     parsedClientID,
 			AccessToken:  tokenResponse.AccessToken,
-			ExpiresAt:    time.Now().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
+			ExpiresAt:    time.Now().Round(0).Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
 			Gcid:         tokenResponse.Gcid,
 			IdToken:      tokenResponse.IdToken,
 			RefreshToken: tokenResponse.RefreshToken,
