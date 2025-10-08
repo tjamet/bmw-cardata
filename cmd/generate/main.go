@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -121,7 +122,14 @@ func BuildContainers(url string, path string) error {
 
 	reprWriter := repr.New(&b)
 
+	categoryNames := []string{}
 	for _, category := range allCategories {
+		categoryNames = append(categoryNames, category.Name)
+	}
+	sort.Strings(categoryNames)
+
+	for _, categoryName := range categoryNames {
+		category := allCategories[categoryName]
 		name := toSnakeCase(category.Name)
 		fmt.Fprintf(&b, "// %s %s\n", name, category.Description)
 		fmt.Fprintf(&b, "%s =", name)
@@ -129,7 +137,7 @@ func BuildContainers(url string, path string) error {
 		fmt.Fprintln(&b)
 	}
 
-	fmt.Fprint(&b, "allContainers = ")
+	fmt.Fprint(&b, "allDescriptors = ")
 	reprWriter.Print(allContainers)
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, ")")
@@ -315,8 +323,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to generate mqtt codes: %v", err)
 	}
-
-	return
 
 	err = BuildContainers("https://www.bmw.de/en-en/utilities/bmw/api/cd/catalogue", "zzcontainers_data.go")
 	if err != nil {
