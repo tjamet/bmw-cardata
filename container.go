@@ -205,13 +205,9 @@ func (c *Client) DeleteContainer(ctx context.Context, containerID string) (*card
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
-	case http.StatusOK:
-		data := cardataapi.DeleteContainerResponse{}
-		err := json.NewDecoder(resp.Body).Decode(&data)
-		if err != nil {
-			return nil, err
-		}
-		return &data, nil
+	case http.StatusNoContent:
+		// No body on deletion success
+		return &cardataapi.DeleteContainerResponse{}, nil
 	default:
 		data := cardataapi.CarDataError{}
 		err := json.NewDecoder(resp.Body).Decode(&data)

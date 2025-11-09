@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
+	"sync"
+	"sync/atomic"
 
 	"github.com/tjamet/bmw-cardata/cardataapi"
 )
@@ -24,7 +27,13 @@ const (
 type Client struct {
 	Authenticator AuthenticatorInterface
 	CarDataServer string
-	carDataAPI    cardataapi.ClientInterface
+	StreamingURL  *url.URL
+
+	carDataAPI cardataapi.ClientInterface
+	streaming  atomic.Pointer[streamingManager]
+
+	m             sync.Mutex
+	subscriptions map[string]map[string]func(message StreamedMessage)
 }
 
 type ClientOption func(*Client) error
@@ -57,17 +66,34 @@ func WithAuthenticator(authenticator AuthenticatorInterface) ClientOption {
 	}
 }
 
+// WithStreamingURL is a client option that allows you to set the streaming URL.
+// This is the base URL for the streaming API.
+func WithStreamingURL(streamingURL *url.URL) ClientOption {
+	return func(c *Client) error {
+		c.StreamingURL = streamingURL
+		return nil
+	}
+}
+
 // NewClient creates a new client with the given options.
 // It will use the default auth server and car data server if not provided.
 // It will use a S256Challenger by default.
 func NewClient(options ...ClientOption) (*Client, error) {
 	client := &Client{
 		CarDataServer: cardataapi.CarDataAPIServer,
+		StreamingURL:  streamingURL,
 	}
 	for _, option := range options {
 		if err := option(client); err != nil {
 			return nil, err
 		}
+	}
+	if client.CarDataServer == cardataapi.CarDataAPIServer && client.Authenticator == nil {
+		authenticator, err := NewAuthenticator()
+		if err != nil {
+			return nil, err
+		}
+		client.Authenticator = authenticator
 	}
 	if client.carDataAPI == nil {
 		carDataAPI, err := cardataapi.NewClientWithResponses(

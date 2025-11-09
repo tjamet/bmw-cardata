@@ -113,13 +113,18 @@ type Authenticator struct {
 }
 
 func NewAuthenticator(options ...AuthenticatorOption) (*Authenticator, error) {
-	authenticator := &Authenticator{
-		SessionStore: &InMemorySessionStore{},
-	}
+	authenticator := &Authenticator{}
 	for _, option := range options {
 		if err := option(authenticator); err != nil {
 			return nil, err
 		}
+	}
+	if authenticator.SessionStore == nil {
+		sessionStore, err := NewFileSessionStore("")
+		if err != nil {
+			return nil, err
+		}
+		authenticator.SessionStore = sessionStore
 	}
 	if authenticator.AuthClient == nil {
 		authClient, err := NewAuthClient()

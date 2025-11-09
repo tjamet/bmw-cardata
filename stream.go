@@ -8,12 +8,17 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
-	"syscall"
+	"sync"
 	"time"
 
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/google/uuid"
+)
+
+const (
+	AllVINs   = "+"
+	AllTopics = "#"
 )
 
 func p[T any](v T) *T {
@@ -126,121 +131,294 @@ type StreamedDataDetails struct {
 	Unit      string            `json:"unit,omitempty"`
 }
 
-// Subscribe allows to subscribe to vehicle changes rather than polling the BMW CarData API.
-// At the time of writing, the BMW API rate limit is set to 50 requests per day.
-//
-// See: https://bmw-cardata.bmwgroup.com/customer/public/api-documentation/Id-CarData-API_Authentication
-//
-// EXP(tjamet): This function is still experimental and its interface may change in the future.
-func (c *Client) Subscribe(ctx context.Context, vin string, callback func(message StreamedMessage)) error {
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-	defer stop()
+type streamingManager struct {
+	Authenticator     AuthenticatorInterface
+	connectionManager *autopaho.ConnectionManager
+	subscriptions     map[string]map[string]func(message StreamedMessage)
+	m                 sync.Mutex
+	streamingURL      *url.URL
+	stop              context.CancelFunc
+	ctx               context.Context
+}
 
-	cliCfg := autopaho.ClientConfig{
-		ServerUrls: []*url.URL{streamingURL},
+type Subscription struct {
+	ID  string
+	VIN string
+}
+
+// Subscribe registers a callback for the provided VINs. The MQTT connection is shared across
+// subscriptions and is managed by the client. The returned subscription ID can be used to
+// unsubscribe later on.
+func (c *Client) Subscribe(ctx context.Context, vin string, callback func(message StreamedMessage)) (*Subscription, error) {
+	if callback == nil {
+		return nil, fmt.Errorf("callback must not be nil")
+	}
+	subscription := Subscription{ID: uuid.New().String(), VIN: vin}
+	c.registerCallback(&subscription, callback)
+
+	err := c.streaming.Load().updateSubscriptions(ctx, c.subscriptions)
+	if err != nil {
+		return nil, err
+	}
+	return &subscription, nil
+}
+
+func (c *Client) Unsubscribe(ctx context.Context, subscription *Subscription) error {
+	if subscription == nil {
+		return fmt.Errorf("subscription must not be nil")
+	}
+	c.unregisterCallback(subscription)
+	err := c.streaming.Load().updateSubscriptions(ctx, c.subscriptions)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) registerCallback(subscription *Subscription, callback func(message StreamedMessage)) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.subscriptions == nil {
+		c.subscriptions = make(map[string]map[string]func(message StreamedMessage))
+	}
+	if _, ok := c.subscriptions[subscription.VIN]; !ok {
+		c.subscriptions[subscription.VIN] = make(map[string]func(message StreamedMessage))
+	}
+	c.subscriptions[subscription.VIN][subscription.ID] = callback
+}
+
+func (c *Client) unregisterCallback(subscription *Subscription) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if _, ok := c.subscriptions[subscription.VIN]; !ok {
+		return
+	}
+	delete(c.subscriptions[subscription.VIN], subscription.ID)
+	if len(c.subscriptions[subscription.VIN]) == 0 {
+		delete(c.subscriptions, subscription.VIN)
+	}
+}
+
+func (c *Client) Done() <-chan struct{} {
+	existing := c.streaming.Load()
+	if existing == nil {
+		return nil
+	}
+	return existing.ctx.Done()
+}
+
+func (c *Client) StartEventStream() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+
+	candidate := &streamingManager{
+		Authenticator: c.Authenticator,
+		streamingURL:  c.StreamingURL,
+		subscriptions: c.subscriptions,
+		ctx:           ctx,
+		stop:          stop,
+	}
+
+	if c.streaming.CompareAndSwap(nil, candidate) {
+		// the new connection manager was successfully stored,
+		// we can start it.
+		// In case there is a concurrent call to `ensureStreamingManager`,
+		// it may happen that the other call wins and our candidate is not the one
+		// stored. In this case, we won't get here, but the other one will
+		// start the connection.
+		if err := candidate.connect(); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		candidate.stop()
+	}
+	return nil
+}
+
+func (c *Client) StopEventStream() error {
+	// try to clean the streaming manager
+	existing := c.streaming.Load()
+	if existing == nil {
+		return nil
+	}
+	if !c.streaming.CompareAndSwap(existing, nil) {
+		// another call to `cleanStreamingManager` won the race and cleaned the manager
+		return nil
+	}
+
+	existing.stop()
+	// Wait for the context to be done, so we can be sure that the connection
+	<-existing.ctx.Done()
+	return nil
+}
+
+func (m *streamingManager) connect() error {
+
+	cm, err := autopaho.NewConnection(m.ctx, m.autopahoConfig())
+	if err != nil {
+		return err
+	}
+	m.connectionManager = cm
+
+	err = cm.AwaitConnection(m.ctx)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-m.ctx.Done()
+		cm.Disconnect(m.ctx)
+	}()
+
+	return nil
+}
+
+func (m *streamingManager) autopahoConfig() autopaho.ClientConfig {
+	return autopaho.ClientConfig{
+		ServerUrls: []*url.URL{m.streamingURL},
 		TlsCfg: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		},
-		KeepAlive: 20,
-		ReconnectBackoff: func(attempt int) time.Duration {
-			return time.Duration(attempt) * 10 * time.Second
-		},
-		// ConnectUsername:               session.Gcid,
-		// ConnectPassword:               []byte(*session.IdToken),
+		KeepAlive:                     20,
+		ReconnectBackoff:              m.handlePahoReconnectBackoff,
 		CleanStartOnInitialConnection: false,
 		SessionExpiryInterval:         60,
-		OnConnectionDown: func() bool {
-			return true
-		},
-		OnConnectError: func(err error) {
-			if connackErr, ok := err.(*autopaho.ConnackError); ok {
-				err = MQTTError(connackErr.ReasonCode)
-			}
-			fmt.Printf("error whilst attempting connection: %s\n", err)
-		},
-		ConnectPacketBuilder: func(connect *paho.Connect, url *url.URL) (*paho.Connect, error) {
-			fmt.Println("building connect packet")
-			session, err := c.Authenticator.GetSession(ctx)
-			if err != nil {
-				return nil, err
-			}
-			connect.UsernameFlag = true
-			connect.PasswordFlag = true
-			connect.Username = session.Gcid
-			connect.Password = []byte(*session.IdToken)
-			connect.Properties = &paho.ConnectProperties{
-				SessionExpiryInterval: p(uint32(time.Until(session.ExpiresAt).Seconds())),
-			}
-			return connect, nil
-		},
+		OnConnectionDown:              m.handlePahoConnectionDown,
+		OnConnectionUp:                m.handlePahoConnectionUp,
+		OnConnectError:                m.handlePahoConnectError,
+		ConnectPacketBuilder:          m.buildPahoConnectPacket,
 		ClientConfig: paho.ClientConfig{
-			ClientID: ClientID,
-			OnClientError: func(err error) {
-				fmt.Printf("client error: %s\n", err)
+			ClientID:      ClientID,
+			OnClientError: m.onPahoClientError,
+			OnPublishReceived: []func(paho.PublishReceived) (bool, error){
+				m.handlePahoPublishReceived,
 			},
+			OnServerDisconnect: m.handlePahoServerDisconnect,
 		},
 	}
-	cliCfg.OnServerDisconnect = func(d *paho.Disconnect) {
+}
 
-		if d.Properties != nil {
-			fmt.Printf("server requested disconnect: %s\n", d.Properties.ReasonString)
-		} else {
-			fmt.Printf("server requested disconnect; reason code: %d\n", d.ReasonCode)
-		}
+func (m *streamingManager) handlePahoPublishReceived(pr paho.PublishReceived) (bool, error) {
+	var msg StreamedMessage
+	if err := json.Unmarshal(pr.Packet.Payload, &msg); err != nil {
+		return true, fmt.Errorf("error unmarshaling message: %w", err)
 	}
+	for _, callback := range m.getCallbacks(msg.VIN) {
+		go callback(msg)
+	}
+	return true, nil
+}
 
-	// OnPublishReceived is a slice of functions that will be called when a message is received.
-	// You can write the function(s) yourself or use the supplied Router
-	cliCfg.ClientConfig.OnPublishReceived = []func(paho.PublishReceived) (bool, error){
-		func(pr paho.PublishReceived) (bool, error) {
-			var msg StreamedMessage
-			err := json.Unmarshal(pr.Packet.Payload, &msg)
-			if err != nil {
-				return true, fmt.Errorf("error unmarshaling message: %s\n", err)
-			}
-			callback(msg)
-			return true, nil
-		},
+func (m *streamingManager) handlePahoServerDisconnect(d *paho.Disconnect) {
+	if d.Properties != nil {
+		fmt.Printf("server requested disconnect: %s\n", d.Properties.ReasonString)
+	} else {
+		fmt.Printf("server requested disconnect; reason code: %d\n", d.ReasonCode)
 	}
-	cliCfg.OnConnectionUp = func(cm *autopaho.ConnectionManager, connAck *paho.Connack) {
-		session, err := c.Authenticator.GetSession(ctx)
+}
+
+func (m *streamingManager) handlePahoConnectError(err error) {
+	if connackErr, ok := err.(*autopaho.ConnackError); ok {
+		err = MQTTError(connackErr.ReasonCode)
+	}
+	fmt.Printf("error whilst attempting connection: %s\n", err)
+}
+
+func (m *streamingManager) handlePahoReconnectBackoff(attempt int) time.Duration {
+	return time.Duration(attempt) * 10 * time.Second
+}
+
+func (m *streamingManager) onPahoClientError(err error) {
+	fmt.Printf("client error: %s\n", err)
+}
+
+func (m *streamingManager) handlePahoConnectionDown() bool {
+	return true
+}
+
+func (m *streamingManager) listSubscribedVINs() []string {
+	m.m.Lock()
+	defer m.m.Unlock()
+	vins := []string{}
+	for vin := range m.subscriptions {
+		vins = append(vins, vin)
+	}
+	return vins
+}
+
+func (m *streamingManager) getCallbacks(vin string) []func(message StreamedMessage) {
+	m.m.Lock()
+	defer m.m.Unlock()
+	callbacks := []func(message StreamedMessage){}
+	for _, callback := range m.subscriptions[vin] {
+		callbacks = append(callbacks, callback)
+	}
+	for _, callback := range m.subscriptions[AllVINs] {
+		callbacks = append(callbacks, callback)
+	}
+	for _, callback := range m.subscriptions[AllTopics] {
+		callbacks = append(callbacks, callback)
+	}
+	return callbacks
+}
+
+func (m *streamingManager) updateSubscriptions(ctx context.Context, newSubscriptions map[string]map[string]func(message StreamedMessage)) error {
+	if m == nil {
+		return nil
+	}
+	m.m.Lock()
+	defer m.m.Unlock()
+	if m.connectionManager != nil {
+		unsubscribe := &paho.Unsubscribe{}
+		session, err := m.Authenticator.GetSession(m.ctx)
 		if err != nil {
 			fmt.Printf("error getting session: %s\n", err)
-			return
+			return err
 		}
-
-		topics := []string{
-			fmt.Sprintf("%s/%s", session.Gcid, vin),
-			fmt.Sprintf("%s/%s/#", session.Gcid, vin),
-			fmt.Sprintf("%s/%s/+", session.Gcid, vin),
+		for vin := range m.subscriptions {
+			if _, ok := newSubscriptions[vin]; !ok {
+				unsubscribe.Topics = append(unsubscribe.Topics, fmt.Sprintf("%s/%s", session.Gcid, vin))
+			}
 		}
-
-		subscriptions := []paho.SubscribeOptions{}
-		for _, topic := range topics {
-			subscriptions = append(subscriptions, paho.SubscribeOptions{Topic: topic, QoS: 1})
+		if unsubscribe.Topics != nil {
+			if _, err := m.connectionManager.Unsubscribe(m.ctx, unsubscribe); err != nil {
+				fmt.Printf("failed to unsubscribe from topics: %s\n", err)
+				return err
+			}
 		}
-
-		// Subscribing in the OnConnectionUp callback is recommended (ensures the subscription is reestablished if
-		// the connection drops)
-		if _, err := cm.Subscribe(context.Background(), &paho.Subscribe{
-			Subscriptions: subscriptions,
-		}); err != nil {
-			fmt.Printf("failed to subscribe (%s). This is likely to mean no messages will be received.", err)
-		}
-		fmt.Println("mqtt subscription made to", strings.Join(topics, ", "))
 	}
-
-	connection, err := autopaho.NewConnection(ctx, cliCfg) // starts process; will reconnect until context cancelled
-	if err != nil {
-		panic(err)
-	}
-
-	// Wait for the connection to come up
-	if err = connection.AwaitConnection(ctx); err != nil {
-		panic(err)
-	}
-
-	<-ctx.Done() // Wait for clean shutdown (cancelling the context triggered the shutdown)
-	fmt.Println("signal caught - exiting")
+	m.subscriptions = newSubscriptions
 	return nil
+}
+
+func (m *streamingManager) handlePahoConnectionUp(cm *autopaho.ConnectionManager, connAck *paho.Connack) {
+	session, err := m.Authenticator.GetSession(m.ctx)
+	if err != nil {
+		fmt.Printf("error getting session: %s\n", err)
+		return
+	}
+
+	subscribe := &paho.Subscribe{}
+	for _, vin := range m.listSubscribedVINs() {
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{Topic: fmt.Sprintf("%s/%s", session.Gcid, vin), QoS: 1})
+	}
+	if subscribe.Subscriptions != nil {
+		if _, err := cm.Subscribe(m.ctx, subscribe); err != nil {
+			fmt.Printf("failed to subscribe to topics: %s\n", err)
+		}
+	}
+}
+
+func (m *streamingManager) buildPahoConnectPacket(connect *paho.Connect, url *url.URL) (*paho.Connect, error) {
+	session, err := m.Authenticator.GetSession(m.ctx)
+	if err != nil {
+		return nil, err
+	}
+	connect.UsernameFlag = true
+	connect.PasswordFlag = true
+	connect.Username = session.Gcid
+	connect.Password = []byte(*session.IdToken)
+	connect.Properties = &paho.ConnectProperties{
+		SessionExpiryInterval: p(uint32(time.Until(session.ExpiresAt).Seconds())),
+	}
+	return connect, nil
 }

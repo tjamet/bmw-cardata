@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 // SessionStore is an interface that allows to store, persist and retrieve authenticated sessions.
@@ -37,6 +38,25 @@ type FileSessionStore struct {
 	session *AuthenticatedSession
 }
 
+func DefaultSessionPath() (string, error) {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homedir, ".local", "share", "bmw-cardata", "session.json"), nil
+}
+
+func NewFileSessionStore(path string) (*FileSessionStore, error) {
+	if path == "" {
+		p, err := DefaultSessionPath()
+		if err != nil {
+			return nil, err
+		}
+		path = p
+	}
+	return &FileSessionStore{Path: path}, nil
+}
+
 func (s *FileSessionStore) Get(ctx context.Context) (*AuthenticatedSession, error) {
 	if s.session != nil {
 		return s.session, nil
@@ -57,6 +77,10 @@ func (s *FileSessionStore) Get(ctx context.Context) (*AuthenticatedSession, erro
 func (s *FileSessionStore) Save(ctx context.Context, session *AuthenticatedSession) error {
 	s.session = session
 	data, err := json.Marshal(session)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(filepath.Dir(s.Path), 0700)
 	if err != nil {
 		return err
 	}

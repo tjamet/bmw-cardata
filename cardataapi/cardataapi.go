@@ -648,6 +648,7 @@ func (c *Client) DeleteContainer(ctx context.Context, containerId string, reqEdi
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-Version", "v1")
 	req = req.WithContext(ctx)
 	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
 		return nil, err
