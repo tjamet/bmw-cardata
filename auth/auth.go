@@ -81,9 +81,6 @@ type DeviceCodeResponse struct {
 
 	// VerificationUri Link to the UI that allows the user to enter the user_code.
 	VerificationUri string `json:"verification_uri"`
-
-	// VerificationUriComplete Link to the UI with the user_code generated.
-	VerificationUriComplete string `json:"verification_uri_complete"`
 }
 
 // TokenAccessDeniedResponse defines model for TokenAccessDeniedResponse.

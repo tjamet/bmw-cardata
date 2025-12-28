@@ -95,12 +95,11 @@ func TestInitiateAuthenticationSession_Success(t *testing.T) {
 	m.postDeviceCode = func(ctx context.Context, params *authapi.PostGcdmOauthDeviceCodeParams, body authapi.PostGcdmOauthDeviceCodeFormdataRequestBody, reqEditors ...authapi.RequestEditorFn) (*http.Response, error) {
 		interval := 3
 		return httpResp(http.StatusOK, authapi.DeviceCodeResponse{
-			DeviceCode:              "dev-code",
-			ExpiresIn:               600,
-			Interval:                &interval,
-			UserCode:                "USER-1234",
-			VerificationUri:         "https://verify",
-			VerificationUriComplete: "https://verify?code=USER-1234",
+			DeviceCode:      "dev-code",
+			ExpiresIn:       600,
+			Interval:        &interval,
+			UserCode:        "USER-1234",
+			VerificationUri: "https://verify",
 		}), nil
 	}
 	c := &AuthClient{auth: m, Challenger: &mockChallenger{challenge: "challenge", verifier: "verifier"}}
@@ -253,10 +252,9 @@ func TestAuthenticatorGetSession(t *testing.T) {
 			ClientID:   testClientID,
 			Scopes:     []Scope{ScopeOpenID, ScopeCardataAPI},
 			AuthClient: m,
-			PromptURI: func(uri, code, complete string) {
+			PromptURI: func(uri, code string) {
 				assert.Equal(t, "V", uri)
 				assert.Equal(t, "U", code)
-				assert.Equal(t, "VC", complete)
 			},
 			SessionStore: store,
 		}
@@ -293,10 +291,9 @@ func TestAuthenticatorGetSession(t *testing.T) {
 			ClientID:   testClientID,
 			Scopes:     []Scope{ScopeOpenID, ScopeCardataAPI},
 			AuthClient: m,
-			PromptURI: func(uri, code, complete string) {
+			PromptURI: func(uri, code string) {
 				assert.Equal(t, "V", uri)
 				assert.Equal(t, "U", code)
-				assert.Equal(t, "VC", complete)
 			},
 			SessionStore: store,
 		}
@@ -329,7 +326,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		authenticator := &Authenticator{
 			ClientID:   testClientID,
 			AuthClient: m,
-			PromptURI: func(uri, code, complete string) {
+			PromptURI: func(uri, code string) {
 				t.Error("promptURI should not be called")
 			},
 			SessionStore: store,
@@ -350,7 +347,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		testAuthenticatorGetTokenHandlesGoesThroughNewSession(t, &Authenticator{
 			ClientID:     testClientID,
 			Scopes:       []Scope{ScopeOpenID},
-			PromptURI:    func(uri, code, complete string) {},
+			PromptURI:    func(uri, code string) {},
 			SessionStore: nil,
 		})
 	})
@@ -358,7 +355,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		testAuthenticatorGetTokenHandlesGoesThroughNewSession(t, &Authenticator{
 			ClientID:     testClientID,
 			Scopes:       []Scope{ScopeOpenID},
-			PromptURI:    func(uri, code, complete string) {},
+			PromptURI:    func(uri, code string) {},
 			SessionStore: &InMemorySessionStore{},
 		})
 	})
@@ -373,7 +370,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		}
 		authenticator := &Authenticator{
 			AuthClient: m,
-			PromptURI:  func(uri, code, complete string) {},
+			PromptURI:  func(uri, code string) {},
 		}
 		got, err := authenticator.GetSession(context.Background())
 		require.Error(t, err)
@@ -389,7 +386,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		authenticator := &Authenticator{
 			ClientID:   testClientID,
 			AuthClient: m,
-			PromptURI:  func(uri, code, complete string) {},
+			PromptURI:  func(uri, code string) {},
 			SessionStore: &InMemorySessionStore{
 				session: &AuthenticatedSession{
 					ClientID:  uuid.MustParse(testClientID),
@@ -420,7 +417,7 @@ func TestAuthenticatorGetSession(t *testing.T) {
 		authenticator := &Authenticator{
 			AuthClient: m,
 			ClientID:   testClientID,
-			PromptURI:  func(uri, code, complete string) {},
+			PromptURI:  func(uri, code string) {},
 			SessionStore: &InMemorySessionStore{
 				session: &AuthenticatedSession{
 					ClientID:  uuid.MustParse(testClientID),

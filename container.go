@@ -169,10 +169,7 @@ func (c *Client) CreateContainer(ctx context.Context, name, purpose string, cont
 		descriptors[i] = container.ID
 	}
 	opts.TechnicalDescriptors = &descriptors
-	resp, err := c.carDataAPI.CreateContainer(ctx, *opts, func(ctx context.Context, req *http.Request) error {
-		req.Header.Set("X-Version", "v1")
-		return nil
-	})
+	resp, err := c.carDataAPI.CreateContainer(ctx, &cardataapi.CreateContainerParams{XVersion: "v1"}, *opts)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +196,7 @@ func (c *Client) CreateContainer(ctx context.Context, name, purpose string, cont
 // See https://bmw-cardata.bmwgroup.com/customer/public/api-specification#operations-Containers-deleteContainer
 // BUG(tjamet): DeleteContainer is not working. It always returns a 400 error and needs to be investigated and fixed.
 func (c *Client) DeleteContainer(ctx context.Context, containerID string) (*cardataapi.DeleteContainerResponse, error) {
-	resp, err := c.carDataAPI.DeleteContainer(ctx, containerID)
+	resp, err := c.carDataAPI.DeleteContainer(ctx, containerID, &cardataapi.DeleteContainerParams{XVersion: "v1"})
 	if err != nil {
 		return nil, err
 	}

@@ -48,9 +48,11 @@ func main() {
 			bmwcardata.WithAuthenticator(bmwcardata.Must(bmwcardata.NewAuthenticator(
 				bmwcardata.WithSessionStore(&bmwcardata.FileSessionStore{Path: *sessionPath}),
 				bmwcardata.WithClientID(*clientID),
-				bmwcardata.WithPromptURI(func(uri, code, complete string) {
+				bmwcardata.WithPromptURI(func(uri, code string) {
 					fmt.Println("Open the following URL in your browser:")
-					fmt.Println(complete)
+					fmt.Println(uri)
+					fmt.Println("And enter the code:")
+					fmt.Println(code)
 				}),
 			))),
 		)

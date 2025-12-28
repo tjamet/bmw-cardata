@@ -450,6 +450,16 @@ type ListContainersParams struct {
 	XVersion string `json:"x-version"`
 }
 
+// CreateContainerParams defines parameters for CreateContainer.
+type CreateContainerParams struct {
+	XVersion string `json:"x-version"`
+}
+
+// DeleteContainerParams defines parameters for DeleteContainer.
+type DeleteContainerParams struct {
+	XVersion string `json:"x-version"`
+}
+
 // GetContainerDetailsParams defines parameters for GetContainerDetails.
 type GetContainerDetailsParams struct {
 	XVersion string `json:"x-version"`
@@ -575,12 +585,12 @@ type ClientInterface interface {
 	ListContainers(ctx context.Context, params *ListContainersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateContainerWithBody request with any body
-	CreateContainerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateContainerWithBody(ctx context.Context, params *CreateContainerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	CreateContainer(ctx context.Context, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateContainer(ctx context.Context, params *CreateContainerParams, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteContainer request
-	DeleteContainer(ctx context.Context, containerId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteContainer(ctx context.Context, containerId string, params *DeleteContainerParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetContainerDetails request
 	GetContainerDetails(ctx context.Context, containerId string, params *GetContainerDetailsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -619,8 +629,8 @@ func (c *Client) ListContainers(ctx context.Context, params *ListContainersParam
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateContainerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateContainerRequestWithBody(c.Server, contentType, body)
+func (c *Client) CreateContainerWithBody(ctx context.Context, params *CreateContainerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateContainerRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -631,8 +641,8 @@ func (c *Client) CreateContainerWithBody(ctx context.Context, contentType string
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateContainer(ctx context.Context, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateContainerRequest(c.Server, body)
+func (c *Client) CreateContainer(ctx context.Context, params *CreateContainerParams, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateContainerRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -643,12 +653,11 @@ func (c *Client) CreateContainer(ctx context.Context, body CreateContainerJSONRe
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteContainer(ctx context.Context, containerId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteContainerRequest(c.Server, containerId)
+func (c *Client) DeleteContainer(ctx context.Context, containerId string, params *DeleteContainerParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteContainerRequest(c.Server, containerId, params)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Version", "v1")
 	req = req.WithContext(ctx)
 	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
 		return nil, err
@@ -793,18 +802,18 @@ func NewListContainersRequest(server string, params *ListContainersParams) (*htt
 }
 
 // NewCreateContainerRequest calls the generic CreateContainer builder with application/json body
-func NewCreateContainerRequest(server string, body CreateContainerJSONRequestBody) (*http.Request, error) {
+func NewCreateContainerRequest(server string, params *CreateContainerParams, body CreateContainerJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewCreateContainerRequestWithBody(server, "application/json", bodyReader)
+	return NewCreateContainerRequestWithBody(server, params, "application/json", bodyReader)
 }
 
 // NewCreateContainerRequestWithBody generates requests for CreateContainer with any type of body
-func NewCreateContainerRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+func NewCreateContainerRequestWithBody(server string, params *CreateContainerParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -829,11 +838,24 @@ func NewCreateContainerRequestWithBody(server string, contentType string, body i
 
 	req.Header.Add("Content-Type", contentType)
 
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-version", runtime.ParamLocationHeader, params.XVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-version", headerParam0)
+
+	}
+
 	return req, nil
 }
 
 // NewDeleteContainerRequest generates requests for DeleteContainer
-func NewDeleteContainerRequest(server string, containerId string) (*http.Request, error) {
+func NewDeleteContainerRequest(server string, containerId string, params *DeleteContainerParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -861,6 +883,19 @@ func NewDeleteContainerRequest(server string, containerId string) (*http.Request
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-version", runtime.ParamLocationHeader, params.XVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-version", headerParam0)
+
 	}
 
 	return req, nil
@@ -1368,12 +1403,12 @@ type ClientWithResponsesInterface interface {
 	ListContainersWithResponse(ctx context.Context, params *ListContainersParams, reqEditors ...RequestEditorFn) (*ListContainersResponse, error)
 
 	// CreateContainerWithBodyWithResponse request with any body
-	CreateContainerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error)
+	CreateContainerWithBodyWithResponse(ctx context.Context, params *CreateContainerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error)
 
-	CreateContainerWithResponse(ctx context.Context, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error)
+	CreateContainerWithResponse(ctx context.Context, params *CreateContainerParams, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error)
 
 	// DeleteContainerWithResponse request
-	DeleteContainerWithResponse(ctx context.Context, containerId string, reqEditors ...RequestEditorFn) (*DeleteContainerResponse, error)
+	DeleteContainerWithResponse(ctx context.Context, containerId string, params *DeleteContainerParams, reqEditors ...RequestEditorFn) (*DeleteContainerResponse, error)
 
 	// GetContainerDetailsWithResponse request
 	GetContainerDetailsWithResponse(ctx context.Context, containerId string, params *GetContainerDetailsParams, reqEditors ...RequestEditorFn) (*GetContainerDetailsResponse, error)
@@ -1791,16 +1826,16 @@ func (c *ClientWithResponses) ListContainersWithResponse(ctx context.Context, pa
 }
 
 // CreateContainerWithBodyWithResponse request with arbitrary body returning *CreateContainerResponse
-func (c *ClientWithResponses) CreateContainerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error) {
-	rsp, err := c.CreateContainerWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) CreateContainerWithBodyWithResponse(ctx context.Context, params *CreateContainerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error) {
+	rsp, err := c.CreateContainerWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseCreateContainerResponse(rsp)
 }
 
-func (c *ClientWithResponses) CreateContainerWithResponse(ctx context.Context, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error) {
-	rsp, err := c.CreateContainer(ctx, body, reqEditors...)
+func (c *ClientWithResponses) CreateContainerWithResponse(ctx context.Context, params *CreateContainerParams, body CreateContainerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContainerResponse, error) {
+	rsp, err := c.CreateContainer(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1808,8 +1843,8 @@ func (c *ClientWithResponses) CreateContainerWithResponse(ctx context.Context, b
 }
 
 // DeleteContainerWithResponse request returning *DeleteContainerResponse
-func (c *ClientWithResponses) DeleteContainerWithResponse(ctx context.Context, containerId string, reqEditors ...RequestEditorFn) (*DeleteContainerResponse, error) {
-	rsp, err := c.DeleteContainer(ctx, containerId, reqEditors...)
+func (c *ClientWithResponses) DeleteContainerWithResponse(ctx context.Context, containerId string, params *DeleteContainerParams, reqEditors ...RequestEditorFn) (*DeleteContainerResponse, error) {
+	rsp, err := c.DeleteContainer(ctx, containerId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

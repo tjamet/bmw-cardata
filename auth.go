@@ -81,7 +81,7 @@ func WithScopes(scopes []Scope) AuthenticatorOption {
 	}
 }
 
-func WithPromptURI(promptURI func(string, string, string)) AuthenticatorOption {
+func WithPromptURI(promptURI func(string, string)) AuthenticatorOption {
 	return func(c *Authenticator) error {
 		c.PromptURI = promptURI
 		return nil
@@ -109,7 +109,7 @@ type Authenticator struct {
 	SessionStore SessionStore
 	ClientID     string
 	Scopes       []Scope
-	PromptURI    func(string, string, string)
+	PromptURI    func(string, string)
 }
 
 func NewAuthenticator(options ...AuthenticatorOption) (*Authenticator, error) {
@@ -120,11 +120,7 @@ func NewAuthenticator(options ...AuthenticatorOption) (*Authenticator, error) {
 		}
 	}
 	if authenticator.SessionStore == nil {
-		sessionStore, err := NewFileSessionStore("")
-		if err != nil {
-			return nil, err
-		}
-		authenticator.SessionStore = sessionStore
+		authenticator.SessionStore = defaultSessionStore
 	}
 	if authenticator.AuthClient == nil {
 		authClient, err := NewAuthClient()
@@ -199,7 +195,7 @@ func (c *Authenticator) NewSession(ctx context.Context) (*AuthenticatedSession, 
 	if delay == 0 {
 		delay = 10
 	}
-	c.PromptURI(authSession.VerificationURI, authSession.UserCode, authSession.VerificationURIComplete)
+	c.PromptURI(authSession.VerificationURI, authSession.UserCode)
 	for time.Now().Before(expiresAt) {
 		tokenResponse, err := c.AuthClient.PollAuthToken(ctx, authSession)
 		err = ignoreFlowNotCompleted(err)
@@ -332,13 +328,12 @@ func (c *AuthClient) InitiateAuthenticationSession(ctx context.Context, clientID
 	}
 	if structuredResponse.JSON200 != nil {
 		authSession := &AuthenticationSession{
-			ClientID:                parsedClientID,
-			UserCode:                structuredResponse.JSON200.UserCode,
-			DeviceCode:              structuredResponse.JSON200.DeviceCode,
-			VerificationURI:         structuredResponse.JSON200.VerificationUri,
-			VerificationURIComplete: structuredResponse.JSON200.VerificationUriComplete,
-			ExpiresIn:               structuredResponse.JSON200.ExpiresIn,
-			Verifier:                codeVerifier,
+			ClientID:        parsedClientID,
+			UserCode:        structuredResponse.JSON200.UserCode,
+			DeviceCode:      structuredResponse.JSON200.DeviceCode,
+			VerificationURI: structuredResponse.JSON200.VerificationUri,
+			ExpiresIn:       structuredResponse.JSON200.ExpiresIn,
+			Verifier:        codeVerifier,
 		}
 		if structuredResponse.JSON200.Interval != nil {
 			authSession.Interval = *structuredResponse.JSON200.Interval

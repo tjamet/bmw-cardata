@@ -32,6 +32,16 @@ func (s *InMemorySessionStore) Save(ctx context.Context, session *AuthenticatedS
 	return nil
 }
 
+type NoSessionStore struct{}
+
+func (s *NoSessionStore) Get(ctx context.Context) (*AuthenticatedSession, error) {
+	return nil, nil
+}
+
+func (s *NoSessionStore) Save(ctx context.Context, session *AuthenticatedSession) error {
+	return nil
+}
+
 // FileSessionStore is a session store that persists the session to a file.
 type FileSessionStore struct {
 	Path    string
@@ -56,6 +66,8 @@ func NewFileSessionStore(path string) (*FileSessionStore, error) {
 	}
 	return &FileSessionStore{Path: path}, nil
 }
+
+var defaultSessionStore SessionStore = Must(NewFileSessionStore(""))
 
 func (s *FileSessionStore) Get(ctx context.Context) (*AuthenticatedSession, error) {
 	if s.session != nil {

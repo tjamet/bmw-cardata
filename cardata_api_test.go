@@ -12,15 +12,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/tjamet/bmw-cardata/cardataapi"
 )
 
 // mockCardataClient implements cardataapi.ClientInterface for tests
 type mockCardataClient struct {
 	ListContainersFunc                   func(ctx context.Context, params *cardataapi.ListContainersParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
-	CreateContainerFunc                  func(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
-	CreateContainerWithBodyFunc          func(ctx context.Context, contentType string, body io.Reader, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
-	DeleteContainerFunc                  func(ctx context.Context, containerId string, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
+	CreateContainerFunc                  func(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
+	CreateContainerWithBodyFunc          func(ctx context.Context, params *cardataapi.CreateContainerParams, contentType string, body io.Reader, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
+	DeleteContainerFunc                  func(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
 	GetContainerDetailsFunc              func(ctx context.Context, containerId string, params *cardataapi.GetContainerDetailsParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
 	GetMappingsFunc                      func(ctx context.Context, params *cardataapi.GetMappingsParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
 	GetBasicDataFunc                     func(ctx context.Context, vin string, params *cardataapi.GetBasicDataParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
@@ -31,6 +33,8 @@ type mockCardataClient struct {
 	GetTelematicDataFunc                 func(ctx context.Context, vin string, params *cardataapi.GetTelematicDataParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
 }
 
+var _ cardataapi.ClientInterface = (*mockCardataClient)(nil)
+
 func (m *mockCardataClient) ListContainers(ctx context.Context, params *cardataapi.ListContainersParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 	if m.ListContainersFunc != nil {
 		return m.ListContainersFunc(ctx, params, reqEditors...)
@@ -38,23 +42,23 @@ func (m *mockCardataClient) ListContainers(ctx context.Context, params *cardataa
 	return nil, nil
 }
 
-func (m *mockCardataClient) CreateContainerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
+func (m *mockCardataClient) CreateContainerWithBody(ctx context.Context, params *cardataapi.CreateContainerParams, contentType string, body io.Reader, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 	if m.CreateContainerWithBodyFunc != nil {
-		return m.CreateContainerWithBodyFunc(ctx, contentType, body, reqEditors...)
+		return m.CreateContainerWithBodyFunc(ctx, params, contentType, body, reqEditors...)
 	}
 	return nil, nil
 }
 
-func (m *mockCardataClient) CreateContainer(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
+func (m *mockCardataClient) CreateContainer(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 	if m.CreateContainerFunc != nil {
-		return m.CreateContainerFunc(ctx, body, reqEditors...)
+		return m.CreateContainerFunc(ctx, params, body, reqEditors...)
 	}
 	return nil, nil
 }
 
-func (m *mockCardataClient) DeleteContainer(ctx context.Context, containerId string, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
+func (m *mockCardataClient) DeleteContainer(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 	if m.DeleteContainerFunc != nil {
-		return m.DeleteContainerFunc(ctx, containerId, reqEditors...)
+		return m.DeleteContainerFunc(ctx, containerId, params, reqEditors...)
 	}
 	return nil, nil
 }
@@ -544,14 +548,9 @@ func TestCreateContainer_SetsHeaderAndBody(t *testing.T) {
 	capturedHeader := ""
 	var capturedBody cardataapi.CreateContainerJSONRequestBody
 	mock := &mockCardataClient{
-		CreateContainerFunc: func(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		CreateContainerFunc: func(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			capturedBody = body
-			// Simulate request editors application to capture header
-			req, _ := http.NewRequest(http.MethodPost, "http://example.com", nil)
-			for _, ed := range reqEditors {
-				_ = ed(ctx, req)
-			}
-			capturedHeader = req.Header.Get("X-Version")
+			capturedHeader = params.XVersion
 			return jsonResponse(http.StatusOK, cardataapi.CreateContainerResponse{}, nil), nil
 		},
 	}
@@ -581,7 +580,7 @@ func TestCreateContainer_SetsHeaderAndBody(t *testing.T) {
 func TestCreateContainer_ErrorNon200(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		CreateContainerFunc: func(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		CreateContainerFunc: func(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			msg := "bad"
 			return jsonResponse(http.StatusBadRequest, cardataapi.CarDataError{ExveErrorMsg: &msg}, nil), nil
 		},
@@ -599,27 +598,38 @@ func TestCreateContainer_ErrorNon200(t *testing.T) {
 func TestDeleteContainer_Success(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		DeleteContainerFunc: func(ctx context.Context, containerId string, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		DeleteContainerFunc: func(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			if containerId != "CID" {
 				t.Fatalf("expected containerId CID, got %s", containerId)
 			}
-			return jsonResponse(http.StatusOK, cardataapi.DeleteContainerResponse{}, nil), nil
+			return jsonResponse(http.StatusNoContent, cardataapi.DeleteContainerResponse{}, nil), nil
 		},
 	}
-	c := &Client{carDataAPI: mock}
+	c := &Client{
+		carDataAPI: mock,
+		Authenticator: &Authenticator{
+			SessionStore: &InMemorySessionStore{
+				session: &AuthenticatedSession{
+					ClientID:     uuid.New(),
+					ExpiresAt:    time.Now().Add(1 * time.Hour),
+					RefreshToken: "refresh",
+					AccessToken:  "access",
+					Scope:        "scope",
+					TokenType:    "token_type",
+					Gcid:         uuid.NewString(),
+				},
+			},
+		},
+	}
 	resp, err := c.DeleteContainer(ctx, "CID")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if resp == nil {
-		t.Fatal("expected response, got nil")
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
 }
 
 func TestDeleteContainer_Error(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		DeleteContainerFunc: func(ctx context.Context, containerId string, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		DeleteContainerFunc: func(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			msg := "bad"
 			return jsonResponse(http.StatusBadRequest, cardataapi.CarDataError{ExveErrorMsg: &msg}, nil), nil
 		},
@@ -657,9 +667,10 @@ func ExampleClient_GetBasicData() {
 		WithAuthenticator(
 			Must(NewAuthenticator(
 				WithClientID(clientID),
-				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+				WithPromptURI(func(verificationURI, userCode string) {
 					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+					fmt.Printf("Visit: %s\n", verificationURI)
+					fmt.Printf("Enter code: %s\n", userCode)
 				}),
 			)),
 		)),
@@ -673,7 +684,8 @@ func ExampleClient_GetBasicData() {
 	}
 	fmt.Printf("Vehicle: %+v\n", *vehicle.ModelName)
 	// Output: Open https://example.com and enter code 123456
-	// Direct link: https://example.com?code=123456
+	// Visit: https://example.com
+	// Enter code: 123456
 	// Vehicle: X7
 }
 
@@ -682,9 +694,10 @@ func ExampleClient_GetMappings() {
 		WithAuthenticator(
 			Must(NewAuthenticator(
 				WithClientID(clientID),
-				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+				WithPromptURI(func(verificationURI, userCode string) {
 					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+					fmt.Printf("Visit: %s\n", verificationURI)
+					fmt.Printf("Enter code: %s\n", userCode)
 				}),
 			)),
 		)),
@@ -697,7 +710,8 @@ func ExampleClient_GetMappings() {
 	}
 	fmt.Printf("Mappings: %d\n", len(mappings))
 	// Output: Open https://example.com and enter code 123456
-	// Direct link: https://example.com?code=123456
+	// Visit: https://example.com
+	// Enter code: 123456
 	// Mappings: 2
 }
 
@@ -706,9 +720,10 @@ func ExampleClient_GetChargingHistory() {
 		WithAuthenticator(
 			Must(NewAuthenticator(
 				WithClientID(clientID),
-				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+				WithPromptURI(func(verificationURI, userCode string) {
 					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+					fmt.Printf("Visit: %s\n", verificationURI)
+					fmt.Printf("Enter code: %s\n", userCode)
 				}),
 			)),
 		)),
@@ -722,6 +737,7 @@ func ExampleClient_GetChargingHistory() {
 	}
 	fmt.Printf("Charging history: %+v\n", *chargingHistory.Data[0].EnergyConsumedFromPowerGridKwh)
 	// Output: Open https://example.com and enter code 123456
-	// Direct link: https://example.com?code=123456
+	// Visit: https://example.com
+	// Enter code: 123456
 	// Charging history: 15.4
 }

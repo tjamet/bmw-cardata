@@ -71,7 +71,7 @@ func TestGetContainerDetails_DecodeFailureOnErrorBody(t *testing.T) {
 func TestCreateContainer_DecodeFailureOnSuccess(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		CreateContainerFunc: func(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		CreateContainerFunc: func(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			return bytesResponse(http.StatusOK, []byte("not-json"), nil), nil
 		},
 	}
@@ -85,7 +85,7 @@ func TestCreateContainer_DecodeFailureOnSuccess(t *testing.T) {
 func TestCreateContainer_DecodeFailureOnErrorBody(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		CreateContainerFunc: func(ctx context.Context, body cardataapi.CreateContainerJSONRequestBody, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		CreateContainerFunc: func(ctx context.Context, params *cardataapi.CreateContainerParams, body cardataapi.CreateContainerJSONRequestBody, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			return bytesResponse(http.StatusBadRequest, []byte("not-json"), nil), nil
 		},
 	}
@@ -99,7 +99,7 @@ func TestCreateContainer_DecodeFailureOnErrorBody(t *testing.T) {
 func TestDeleteContainer_DecodeFailureOnSuccess(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		DeleteContainerFunc: func(ctx context.Context, containerId string, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		DeleteContainerFunc: func(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			return bytesResponse(http.StatusOK, []byte("not-json"), nil), nil
 		},
 	}
@@ -113,7 +113,7 @@ func TestDeleteContainer_DecodeFailureOnSuccess(t *testing.T) {
 func TestDeleteContainer_DecodeFailureOnErrorBody(t *testing.T) {
 	ctx := context.Background()
 	mock := &mockCardataClient{
-		DeleteContainerFunc: func(ctx context.Context, containerId string, _ ...cardataapi.RequestEditorFn) (*http.Response, error) {
+		DeleteContainerFunc: func(ctx context.Context, containerId string, params *cardataapi.DeleteContainerParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error) {
 			return bytesResponse(http.StatusBadRequest, []byte("not-json"), nil), nil
 		},
 	}
@@ -215,9 +215,10 @@ func ExampleClient_ListContainers() {
 		WithAuthenticator(
 			Must(NewAuthenticator(
 				WithClientID(clientID),
-				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+				WithPromptURI(func(verificationURI, userCode string) {
 					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+					fmt.Printf("Visit: %s\n", verificationURI)
+					fmt.Printf("Enter code: %s\n", userCode)
 				}),
 			)),
 		)),
@@ -231,7 +232,8 @@ func ExampleClient_ListContainers() {
 	fmt.Printf("Containers: %d\n", len(*containers.Containers))
 
 	// Output: Open https://example.com and enter code 123456
-	// Direct link: https://example.com?code=123456
+	// Visit: https://example.com
+	// Enter code: 123456
 	// Containers: 1
 }
 
@@ -240,9 +242,10 @@ func ExampleClient_CreateContainer() {
 		WithAuthenticator(
 			Must(NewAuthenticator(
 				WithClientID(clientID),
-				WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+				WithPromptURI(func(verificationURI, userCode string) {
 					fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-					fmt.Printf("Direct link: %s\n", verificationURIComplete)
+					fmt.Printf("Visit: %s\n", verificationURI)
+					fmt.Printf("Enter code: %s\n", userCode)
 				}),
 			)),
 		)),
@@ -266,6 +269,7 @@ func ExampleClient_CreateContainer() {
 	fmt.Printf("Containers: %s\n", *result.JSON201.ContainerId)
 
 	// Output: Open https://example.com and enter code 123456
-	// Direct link: https://example.com?code=123456
+	// Visit: https://example.com
+	// Enter code: 123456
 	// Containers: 123456
 }
