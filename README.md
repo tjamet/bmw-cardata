@@ -95,6 +95,78 @@ Scopes default to a safe set: `openid`, `cardata:api:read`, `cardata:streaming:r
 
 Errors include HTTP context and, when available, structured payloads from the API. Log and handle them appropriately; avoid leaking sensitive information.
 
+## Self-hosted proxy (MQTT fan-out + REST cache)
+
+BMW only allows a **single** MQTT streaming connection per client, and the REST
+API is rate limited. The `proxy` package turns one BMW connection into a
+self-hosted front-end so several local consumers can share it:
+
+- a **self-hosted MQTT broker** that keeps the single BMW streaming connection
+  and fans every event out to any number of local subscribers, and
+- a **caching REST reverse proxy** that serves repeated requests from a local
+  cache to reduce pressure on the BMW rate limits.
+
+Incoming MQTT events also refresh the matching cached telematic-data responses,
+so a REST read can return live values; such responses are flagged with the
+`X-Cardata-Mqtt-Updated: true` header. Cache hits are marked `X-Cache: HIT`.
+
+### Running the proxy
+
+```bash
+go run ./cmd/bmw-cardata-proxy \
+  -client-id "00000000-0000-0000-0000-000000000000" \
+  -http-address :8080 \
+  -mqtt-address :1883 \
+  -cache-ttl 5m
+```
+
+The broker is unauthenticated by default. Pass `-mqtt-user`/`-mqtt-password` to
+require login/password, `-rest-user`/`-rest-password` to protect the REST proxy
+with HTTP Basic auth, and `-tls-cert`/`-tls-key` to serve both endpoints over
+TLS ("client TLS"). Use `-vins` to stream specific VINs (defaults to all).
+
+Embedding it in your own program mirrors the CLI:
+
+```go
+server, err := proxy.NewServer(proxy.Config{
+    Authenticator: authenticator, // your BMW authenticator
+    HTTPAddress:   ":8080",
+    MQTTAddress:   ":1883",
+    CacheTTL:      5 * time.Minute,
+    // Optional: MQTTUsers, RESTAuth, HTTPTLS/MQTTTLS, VINs, TopicPrefix...
+})
+if err != nil {
+    log.Fatal(err)
+}
+log.Fatal(server.Run(context.Background()))
+```
+
+### Pointing the client at the proxy (or any custom host)
+
+The same `Client` works against both BMW and a self-hosted host. Override the
+REST server with `WithCarDataServer` and the streaming endpoint with
+`WithStreamingURL`. Because the proxy broker does not implement BMW's MQTT
+authentication scheme, use a `StaticStreamingProfile` (no BMW authenticator
+required):
+
+```go
+streamingURL := bmwcardata.Must(url.Parse("mqtt://proxy.local:1883"))
+
+client := bmwcardata.Must(bmwcardata.NewClient(
+    // REST goes through the caching proxy instead of BMW.
+    bmwcardata.WithCarDataServer("http://proxy.local:8080"),
+    // MQTT connects to the self-hosted broker.
+    bmwcardata.WithStreamingURL(streamingURL),
+    bmwcardata.WithStreamingProfile(bmwcardata.StaticStreamingProfile{
+        // Username/Password only if the broker requires them; TopicPrefix must
+        // match the proxy's -topic-prefix (empty by default).
+    }),
+))
+```
+
+Leave the defaults in place (or omit these options) to talk to the official BMW
+MQTT/REST API exactly as before.
+
 ### Status and roadmap
 
 This client is being developed against the public BMW CarData specification. Coverage will expand as endpoints are implemented and stabilized. Contributions and issue reports are welcome.
