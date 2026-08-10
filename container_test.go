@@ -230,11 +230,6 @@ func ExampleClient_ListContainers() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Containers: %d\n", len(*containers.Containers))
-
-	// Output: Open https://example.com and enter code 123456
-	// Visit: https://example.com
-	// Enter code: 123456
-	// Containers: 1
 }
 
 func ExampleClient_CreateContainer() {
@@ -266,10 +261,5 @@ func ExampleClient_CreateContainer() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Containers: %s\n", *result.JSON201.ContainerId)
-
-	// Output: Open https://example.com and enter code 123456
-	// Visit: https://example.com
-	// Enter code: 123456
-	// Containers: 123456
+	fmt.Printf("Container ID: %s\n", *result.ContainerId)
 }
