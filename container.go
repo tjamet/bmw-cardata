@@ -175,7 +175,7 @@ func (c *Client) CreateContainer(ctx context.Context, name, purpose string, cont
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusCreated:
 		data := cardataapi.CreateContainerResponse{}
 		err := json.NewDecoder(resp.Body).Decode(&data)
 		if err != nil {

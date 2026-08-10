@@ -17,12 +17,6 @@ import (
 	"github.com/tjamet/bmw-cardata/cardataapi"
 )
 
-// clientID is a placeholder BMW-assigned client ID used by the runnable
-// documentation examples in this package. The examples illustrate real usage
-// against the live BMW services, so they are compiled (to keep the snippets
-// correct) but not executed by `go test` (they carry no "// Output:" block).
-const clientID = "00000000-0000-0000-0000-000000000000"
-
 // mockCardataClient implements cardataapi.ClientInterface for tests
 type mockCardataClient struct {
 	ListContainersFunc                   func(ctx context.Context, params *cardataapi.ListContainersParams, reqEditors ...cardataapi.RequestEditorFn) (*http.Response, error)
@@ -689,6 +683,10 @@ func ExampleClient_GetBasicData() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Vehicle: %+v\n", *vehicle.ModelName)
+	// Output: Open https://example.com and enter code 123456
+	// Visit: https://example.com
+	// Enter code: 123456
+	// Vehicle: X7
 }
 
 func ExampleClient_GetMappings() {
@@ -711,6 +709,10 @@ func ExampleClient_GetMappings() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Mappings: %d\n", len(mappings))
+	// Output: Open https://example.com and enter code 123456
+	// Visit: https://example.com
+	// Enter code: 123456
+	// Mappings: 2
 }
 
 func ExampleClient_GetChargingHistory() {
@@ -734,4 +736,8 @@ func ExampleClient_GetChargingHistory() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Charging history: %+v\n", *chargingHistory.Data[0].EnergyConsumedFromPowerGridKwh)
+	// Output: Open https://example.com and enter code 123456
+	// Visit: https://example.com
+	// Enter code: 123456
+	// Charging history: 15.4
 }
