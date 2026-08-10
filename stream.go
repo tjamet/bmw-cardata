@@ -132,7 +132,7 @@ type StreamedDataDetails struct {
 }
 
 type streamingManager struct {
-	Authenticator     AuthenticatorInterface
+	profile           StreamingProfile
 	connectionManager *autopaho.ConnectionManager
 	subscriptions     map[string]map[string]func(message StreamedMessage)
 	m                 sync.Mutex
@@ -211,7 +211,7 @@ func (c *Client) StartEventStream() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 
 	candidate := &streamingManager{
-		Authenticator: c.Authenticator,
+		profile:       c.resolveStreamingProfile(),
 		streamingURL:  c.StreamingURL,
 		subscriptions: c.subscriptions,
 		ctx:           ctx,
@@ -368,20 +368,42 @@ func (m *streamingManager) updateSubscriptions(ctx context.Context, newSubscript
 	m.m.Lock()
 	defer m.m.Unlock()
 	if m.connectionManager != nil {
+		// Unsubscribe from VINs that are no longer subscribed.
 		unsubscribe := &paho.Unsubscribe{}
-		session, err := m.Authenticator.GetSession(m.ctx)
-		if err != nil {
-			fmt.Printf("error getting session: %s\n", err)
-			return err
-		}
 		for vin := range m.subscriptions {
 			if _, ok := newSubscriptions[vin]; !ok {
-				unsubscribe.Topics = append(unsubscribe.Topics, fmt.Sprintf("%s/%s", session.Gcid, vin))
+				topic, err := m.profile.Topic(m.ctx, vin)
+				if err != nil {
+					fmt.Printf("error building topic: %s\n", err)
+					return err
+				}
+				unsubscribe.Topics = append(unsubscribe.Topics, topic)
 			}
 		}
 		if unsubscribe.Topics != nil {
 			if _, err := m.connectionManager.Unsubscribe(m.ctx, unsubscribe); err != nil {
 				fmt.Printf("failed to unsubscribe from topics: %s\n", err)
+				return err
+			}
+		}
+
+		// Subscribe to newly added VINs. Without this, a Subscribe call issued
+		// after the connection is already up would never reach the broker (the
+		// initial subscription only happens on connection-up).
+		subscribe := &paho.Subscribe{}
+		for vin := range newSubscriptions {
+			if _, ok := m.subscriptions[vin]; !ok {
+				topic, err := m.profile.Topic(m.ctx, vin)
+				if err != nil {
+					fmt.Printf("error building topic: %s\n", err)
+					return err
+				}
+				subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{Topic: topic, QoS: 1})
+			}
+		}
+		if subscribe.Subscriptions != nil {
+			if _, err := m.connectionManager.Subscribe(m.ctx, subscribe); err != nil {
+				fmt.Printf("failed to subscribe to topics: %s\n", err)
 				return err
 			}
 		}
@@ -391,15 +413,14 @@ func (m *streamingManager) updateSubscriptions(ctx context.Context, newSubscript
 }
 
 func (m *streamingManager) handlePahoConnectionUp(cm *autopaho.ConnectionManager, connAck *paho.Connack) {
-	session, err := m.Authenticator.GetSession(m.ctx)
-	if err != nil {
-		fmt.Printf("error getting session: %s\n", err)
-		return
-	}
-
 	subscribe := &paho.Subscribe{}
 	for _, vin := range m.listSubscribedVINs() {
-		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{Topic: fmt.Sprintf("%s/%s", session.Gcid, vin), QoS: 1})
+		topic, err := m.profile.Topic(m.ctx, vin)
+		if err != nil {
+			fmt.Printf("error building topic: %s\n", err)
+			return
+		}
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{Topic: topic, QoS: 1})
 	}
 	if subscribe.Subscriptions != nil {
 		if _, err := cm.Subscribe(m.ctx, subscribe); err != nil {
@@ -409,16 +430,8 @@ func (m *streamingManager) handlePahoConnectionUp(cm *autopaho.ConnectionManager
 }
 
 func (m *streamingManager) buildPahoConnectPacket(connect *paho.Connect, url *url.URL) (*paho.Connect, error) {
-	session, err := m.Authenticator.GetSession(m.ctx)
-	if err != nil {
+	if err := m.profile.ConfigureConnect(m.ctx, connect); err != nil {
 		return nil, err
-	}
-	connect.UsernameFlag = true
-	connect.PasswordFlag = true
-	connect.Username = session.Gcid
-	connect.Password = []byte(*session.IdToken)
-	connect.Properties = &paho.ConnectProperties{
-		SessionExpiryInterval: p(uint32(time.Until(session.ExpiresAt).Seconds())),
 	}
 	return connect, nil
 }
