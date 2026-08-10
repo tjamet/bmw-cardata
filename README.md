@@ -54,10 +54,8 @@ func main() {
     authenticator := bmwcardata.Must(bmwcardata.NewAuthenticator(
         bmwcardata.WithClientID(clientID),
         // PromptURI is called to guide the user through the device-code login
-        bmwcardata.WithPromptURI(func(verificationURI, userCode, verificationURIComplete string) {
+        bmwcardata.WithPromptURI(func(verificationURI, userCode string) {
             fmt.Printf("Open %s and enter code %s\n", verificationURI, userCode)
-            // Or directly open verificationURIComplete in a browser
-            fmt.Printf("Direct link: %s\n", verificationURIComplete)
         }),
         // Optionally persist the session locally
         bmwcardata.WithSessionStore(&bmwcardata.FileSessionStore{Path: "bmw_session.json"}),

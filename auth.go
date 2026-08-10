@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/oapi-codegen/runtime/types"
 	"github.com/tjamet/bmw-cardata/auth"
 )
 
@@ -34,7 +33,7 @@ type AuthenticatorInterface interface {
 // It is exclusively used to hold all the relevant information for the authentication flow to complete.
 // It is not persisted and does not allow to authenticate the user to the BMW API.
 type AuthenticationSession struct {
-	ClientID                types.UUID
+	ClientID                uuid.UUID
 	UserCode                string
 	DeviceCode              string
 	Interval                int
@@ -50,7 +49,7 @@ type AuthenticationSession struct {
 // For convenience, the ClientID is also included in this structure.
 // This structure exposes secrets to authenticate users and renew their tokens as they get expired.
 type AuthenticatedSession struct {
-	ClientID    types.UUID
+	ClientID    uuid.UUID
 	AccessToken string    `json:"access_token"`
 	ExpiresAt   time.Time `json:"expires_at"`
 

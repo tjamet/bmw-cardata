@@ -96,7 +96,7 @@ func NewClient(options ...ClientOption) (*Client, error) {
 		client.Authenticator = authenticator
 	}
 	if client.carDataAPI == nil {
-		carDataAPI, err := cardataapi.NewClientWithResponses(
+		carDataAPI, err := cardataapi.NewClient(
 			client.CarDataServer,
 			cardataapi.WithRequestEditorFn(client.injectAuthenticationHeaders),
 		)

@@ -22,10 +22,15 @@ import (
 )
 
 const (
+	// AuthSwaggerURL and CarDataSwagger are the official BMW OpenAPI
+	// specifications. They are mirrored under swagger/ purely as reference for
+	// the hand-written auth and cardataapi packages; nothing consumes them for
+	// code generation.
 	AuthSwaggerURL = "https://bmw-cardata.bmwgroup.com/customer/public/assets/swagger/swagger-device-code-flow.json"
 	CarDataSwagger = "https://bmw-cardata.bmwgroup.com/customer/public/assets/swagger/swagger-customer-api-v1.json"
 )
 
+// saveSwagger downloads the reference OpenAPI specification at url to path.
 func saveSwagger(url string, path string) error {
 	os.MkdirAll(filepath.Dir(path), 0755)
 	response, err := http.Get(url)
@@ -334,7 +339,7 @@ func main() {
 		log.Fatalf("Failed to save auth swagger: %v", err)
 	}
 
-	err = saveSwagger(CarDataSwagger, "swagger/cardataapi.json")
+	err = saveSwagger(CarDataSwagger, "swagger/customer-api.json")
 	if err != nil {
 		log.Fatalf("Failed to save customer api swagger: %v", err)
 	}

@@ -18,6 +18,19 @@ This project is licensed under Apache License 2.0. By contributing, you agree to
 - **Vet (recommended)**: `go vet ./...`
 - **Test**: `go test ./...`
 
+### API clients and code generation
+
+The BMW auth and CarData API clients (the `auth` and `cardataapi` packages) are
+**hand-written** directly against BMW's official OpenAPI specifications. There is
+no OpenAPI/swagger code generation step. When BMW changes the API, update the
+relevant types and operations by hand; the specifications are mirrored under
+`swagger/` for reference.
+
+The only generated files are data tables — the telemetry container catalogue
+(`zzcontainers_data.go`) and the MQTT reason-code reference (`zzmqtt_errors.go`).
+Refresh them (and the reference specs under `swagger/`) with `go generate ./...`,
+which runs `cmd/generate` and requires network access.
+
 ### Coding guidelines
 - Keep changes focused and reasonably small; split up large changes.
 - Add or update tests for new behavior and edge cases.
