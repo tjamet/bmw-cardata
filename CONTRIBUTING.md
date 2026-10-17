@@ -11,7 +11,7 @@ This project is licensed under Apache License 2.0. By contributing, you agree to
 - **Submit code**: Open a pull request following the workflow below.
 
 ### Development setup
-- **Go version**: Use the version in `go.mod` (currently Go 1.25.14).
+- **Go version**: Use the version in `go.mod` (currently Go 1.26.9).
 - **Clone**: Fork the repo and create a feature branch from `bmw-cardata`.
 - **Install deps**: `go mod download`
 - **Format**: `gofmt -s -w .`
