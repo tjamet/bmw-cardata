@@ -5,7 +5,7 @@ go 1.27.2
 require (
 	github.com/alecthomas/repr v0.5.4
 	github.com/eclipse/paho.golang v0.23.0
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.61.0
 )
