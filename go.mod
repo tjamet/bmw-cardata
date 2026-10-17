@@ -1,6 +1,6 @@
 module github.com/tjamet/bmw-cardata
 
-go 1.26.9
+go 1.27.2
 
 require (
 	github.com/alecthomas/repr v0.5.2
